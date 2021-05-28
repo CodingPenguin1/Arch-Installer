@@ -5,8 +5,8 @@ timedatectl set-ntp true
 echo "--------------------------------"
 echo "Partitioning Target Install Disk"
 echo "--------------------------------"
-echo -e "\nSelect your disk to format:"
 fdisk -l
+echo -e "\nSelect your disk to format:"
 read DISK
 echo -e "\nFormatting disk...\n$HR"
 
