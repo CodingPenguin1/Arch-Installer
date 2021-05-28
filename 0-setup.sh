@@ -46,7 +46,7 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot
 echo "Chrooting, please run 1-systemconfiguration.sh next"
-arch-chroot /mnt /bin/bash << EOF
+# arch-chroot /mnt /bin/bash << EOF
 
 echo "--------------------"
 echo "System Configuration"
@@ -73,15 +73,16 @@ echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$HOSTNAME.localdomain 
 echo "Building kernel"
 mkinitcpio -p linux
 
-# Set root password
-echo "Enter root password:"
-passwd
-
 # Installing grub
 echo "Installing grub"
 pacman -S grub
 grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=ARCH
 grub-mkconfig -o /boot/grub/grub.cfg
+exit
+
+# Set root password
+echo "Enter root password:"
+passwd
 
 # Reboot
 echo "Hit ENTER to reboot and complete installation. Remember to remove installation media"
