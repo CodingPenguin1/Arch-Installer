@@ -1,61 +1,57 @@
 #!/usr/bin/env bash
-#-------------------------------------------------------------------------
-#      _          _    __  __      _   _
-#     /_\  _ _ __| |_ |  \/  |__ _| |_(_)__
-#    / _ \| '_/ _| ' \| |\/| / _` |  _| / _|
-#   /_/ \_\_| \__|_||_|_|  |_\__,_|\__|_\__|
-#  Arch Linux Post Install Setup and Config
-#-------------------------------------------------------------------------
 
-if ! source install.conf; then
-	read -p "Please enter hostname:" hostname
+timedatectl set-ntp true
 
-	read -p "Please enter username:" username
+echo "--------------------------------"
+echo "Partitioning Target Install Disk"
+echo "--------------------------------"
+fdisk -l
+echo -e "\nSelect your disk to format:"
+read DISK
+echo -e "\nFormatting disk...\n$HR"
 
-	read -sp "Please enter password:" password
+# Disk prep
+sgdisk -Z ${DISK}
+sgdisk -a 2048 -o ${DISK}
 
-	read -sp "Please repeat password:" password2
+# Create partitions
+sgdisk -n 1:0:+512M ${DISK} # partition 1 (EFI), default start, 512M
+sgdisk -n 2:0:0     ${DISK} # partition 2 (Root), default start, remaining
 
-	# Check both passwords match
-	if [ "$password" != "$password2" ]; then
-	    echo "Passwords do not match"
-	    exit 1
-	fi
-  printf "hostname="$hostname"\n" >> "install.conf"
-  printf "username="$username"\n" >> "install.conf"
-  printf "password="$password"\n" >> "install.conf"
-fi
+# Set partition types
+sgdisk -t 1:ef00 ${DISK}
+sgdisk -t 2:8300 ${DISK}
 
-echo "-------------------------------------------------"
-echo "Setting up mirrors for optimal download - US Only"
-echo "-------------------------------------------------"
-pacman -S --noconfirm pacman-contrib curl
-mv /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
-curl -s "https://www.archlinux.org/mirrorlist/?country=US&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - > /etc/pacman.d/mirrorlist
+# Make filesystems
+echo -e "\nCreating Filesystems...\n$HR"
+mkfs.vfat ${DISK}1
+mkfs.ext4 ${DISK}2
 
-nc=$(grep -c ^processor /proc/cpuinfo)
-echo "You have " $nc" cores."
-echo "-------------------------------------------------"
-echo "Changing the makeflags for "$nc" cores."
-sudo sed -i 's/#MAKEFLAGS="-j2"/MAKEFLAGS="-j$nc"/g' /etc/makepkg.conf
-echo "Changing the compression settings for "$nc" cores."
-sudo sed -i 's/COMPRESSXZ=(xz -c -z -)/COMPRESSXZ=(xz -c -T $nc -z -)/g' /etc/makepkg.conf
+# Mount target
+mount ${DISK}2 /mnt
+mkdir /mnt/efi
+mount ${DISK}1 /mnt/efi
 
-echo "-------------------------------------------------"
-echo "       Setup Language to US and set locale       "
-echo "-------------------------------------------------"
-sed -i 's/^#en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen
-locale-gen
-timedatectl --no-ask-password set-timezone America/Chicago
-timedatectl --no-ask-password set-ntp 1
-localectl --no-ask-password set-locale LANG="en_US.UTF-8" LC_COLLATE="" LC_TIME="en_US.UTF-8"
 
-# Set keymaps
-localectl --no-ask-password set-keymap us
+echo "--------------------------"
+echo "Arch Install on Main Drive"
+echo "--------------------------"
+pacstrap /mnt base linux linux-firmware dialog wpa_supplicant efibootmgr grub dhcp networkmanager nano vim --noconfirm --needed
 
-# Hostname
-hostnamectl --no-ask-password set-hostname $hostname
 
-# Add sudo no password rights
-sed -i 's/^# %wheel ALL=(ALL) NOPASSWD: ALL/%wheel ALL=(ALL) NOPASSWD: ALL/' /etc/sudoers
+echo "--------------------"
+echo "System Configuration"
+echo "--------------------"
 
+# Fstab
+echo "Generating fstab"
+genfstab -U /mnt >> /mnt/etc/fstab
+
+# Chroot
+echo "Chrooting, please run 1-systemconfiguration.sh next"
+arch-chroot /mnt
+
+# Reboot
+echo "Hit ENTER to reboot and complete installation. Remember to remove installation media"
+read REBOOT
+reboot
