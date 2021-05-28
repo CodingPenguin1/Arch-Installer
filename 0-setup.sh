@@ -75,7 +75,6 @@ mkinitcpio -p linux
 
 # Installing grub
 echo "Installing grub"
-pacman -S grub
 grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=ARCH
 grub-mkconfig -o /boot/grub/grub.cfg
 exit
