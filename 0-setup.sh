@@ -44,9 +44,13 @@ pacstrap /mnt base linux linux-firmware dialog wpa_supplicant efibootmgr grub dh
 echo "Generating fstab"
 genfstab -U /mnt >> /mnt/etc/fstab
 
+# Getting hostname
+echo "Enter system hostname:"
+read HOSTNAME
+
 # Chroot
 echo "Chrooting, please run 1-systemconfiguration.sh next"
-# arch-chroot /mnt /bin/bash << EOF
+arch-chroot /mnt /bin/bash << EOF
 
 echo "--------------------"
 echo "System Configuration"
@@ -65,8 +69,6 @@ locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
 # Network configuration
-echo "Enter system hostname:"
-read HOSTNAME
 echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$HOSTNAME.localdomain $HOSTNAME"
 
 # Build kernel
