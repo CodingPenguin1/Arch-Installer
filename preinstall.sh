@@ -12,8 +12,8 @@ curl -s "https://www.archlinux.org/mirrorlist/?country=US&protocol=https&use_mir
 echo "--------------------------------"
 echo "Partitioning Target Install Disk"
 echo "--------------------------------"
-echo "\nSelect your disk to format:"
-lsblk
+echo -e "\nSelect your disk to format:"
+fdisk -l
 read DISK
 echo -e "\nFormatting disk...\n$HR"
 
