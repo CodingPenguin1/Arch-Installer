@@ -48,18 +48,18 @@ echo "Generating fstab"
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot
-echo "chrooting"
+echo "Chrooting"
 arch-chroot /mnt
 
 # Time zone
-echo "setting timezone to America/New_York"
+echo "Setting timezone to America/New_York"
 ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
-hwclocl --systohc
+hwclock --systohc
 
 # Localization
 echo "Generating locales"
-sed -i '1i en_US.UTF-8 UTF-8'
-sed -i '1i en_US ISO-8859-1'
+sed -i '1i en_US.UTF-8 UTF-8' /etc/locale.gen
+sed -i '1i en_US ISO-8859-1' /etc/locale.gen
 locale-gen
 echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
@@ -77,11 +77,12 @@ echo "Enter root password:"
 passwd
 
 # Installing grub
+echo "Installing grub"
 pacman -S grub
 grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=ARCH
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # Reboot
-echo "Hit ENTER to reboot and complete installation"
+echo "Hit ENTER to reboot and complete installation. Remember to remove installation media"
 read REBOOT
 reboot
