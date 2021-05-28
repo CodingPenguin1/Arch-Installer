@@ -46,7 +46,7 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot
 echo "Chrooting, please run 1-systemconfiguration.sh next"
-arch-chroot /mnt
+arch-chroot /mnt /bin/bash << EOF
 
 echo "--------------------"
 echo "System Configuration"
