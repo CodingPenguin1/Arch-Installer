@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-#-------------------------------------------------------------------------
-#      _          _    __  __      _   _
-#     /_\  _ _ __| |_ |  \/  |__ _| |_(_)__
-#    / _ \| '_/ _| ' \| |\/| / _` |  _| / _|
-#   /_/ \_\_| \__|_||_|_|  |_\__,_|\__|_\__|
-#  Arch Linux Post Install Setup and Config
-#-------------------------------------------------------------------------
 
 echo "-------------------------------------------------"
 echo "Setting up mirrors for optimal download - US Only"
@@ -16,82 +9,86 @@ mv /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
 curl -s "https://www.archlinux.org/mirrorlist/?country=US&protocol=https&use_mirror_status=on" | sed -e 's/^#Server/Server/' -e '/^#/d' | rankmirrors -n 5 - > /etc/pacman.d/mirrorlist
 
 
-
-echo -e "\nInstalling prereqs...\n$HR"
-pacman -S --noconfirm gptfdisk btrfs-progs
-
-echo "-------------------------------------------------"
-echo "-------select your disk to format----------------"
-echo "-------------------------------------------------"
+echo "--------------------------------"
+echo "Partitioning Target Install Disk"
+echo "--------------------------------"
+echo "\nSelect your disk to format:"
 lsblk
-echo "Please enter disk: (example /dev/sda)"
 read DISK
-echo "--------------------------------------"
 echo -e "\nFormatting disk...\n$HR"
-echo "--------------------------------------"
 
-# disk prep
-sgdisk -Z ${DISK} # zap all on disk
-sgdisk -a 2048 -o ${DISK} # new gpt disk 2048 alignment
+# Disk prep
+sgdisk -Z ${DISK}
+sgdisk -a 2048 -o ${DISK}
 
-# create partitions
-sgdisk -n 1:0:+1000M ${DISK} # partition 1 (UEFI SYS), default start block, 512MB
+# Create partitions
+sgdisk -n 1:0:+512M ${DISK} # partition 1 (EFI), default start, 512M
 sgdisk -n 2:0:0     ${DISK} # partition 2 (Root), default start, remaining
 
-# set partition types
+# Set partition types
 sgdisk -t 1:ef00 ${DISK}
 sgdisk -t 2:8300 ${DISK}
 
-# label partitions
-sgdisk -c 1:"UEFISYS" ${DISK}
-sgdisk -c 2:"ROOT" ${DISK}
-
-# make filesystems
+# Make filesystems
 echo -e "\nCreating Filesystems...\n$HR"
+mkfs.vfat ${DISK}1
+mkfs.ext4 ${DISK}2
 
-mkfs.vfat -F32 -n "UEFISYS" "${DISK}1"
-mkfs.ext4 -L "ROOT" "${DISK}2"
+# Mount target
+mount ${DISK}2 /mnt
+mkdir /mnt/efi
+mount ${DISK}1 /mnt/efi
 
-# mount target
-mkdir /mnt
-mount -t ext4 "${DISK}2" /mnt
-mkdir /mnt/boot
-mkdir /mnt/boot/efi
-mount -t vfat "${DISK}1" /mnt/boot/
 
-echo "--------------------------------------"
-echo "-- Arch Install on Main Drive       --"
-echo "--------------------------------------"
-pacstrap /mnt base base-devel linux linux-firmware vim nano sudo --noconfirm --needed
+echo "--------------------------"
+echo "Arch Install on Main Drive"
+echo "--------------------------"
+pacstrap /mnt base linux linux-firmware dialog wpa_supplicant efibootmgr grub dhcp networkmanager nano vim --noconfirm --needed
+
+
+echo "--------------------"
+echo "System Configuration"
+echo "--------------------"
+
+# Fstab
+echo "Generating fstab"
 genfstab -U /mnt >> /mnt/etc/fstab
+
+# Chroot
+echo "chrooting"
 arch-chroot /mnt
 
-echo "--------------------------------------"
-echo "-- Bootloader Systemd Installation  --"
-echo "--------------------------------------"
-bootctl install
-cat <<EOF > /boot/loader/entries/arch.conf
-title Arch Linux  
-linux /vmlinuz-linux  
-initrd  /initramfs-linux.img  
-options root=${DISK}1 rw
-EOF
+# Time zone
+echo "setting timezone to America/New_York"
+ln -sf /usr/share/zoneinfo/America/New_York /etc/localtime
+hwclocl --systohc
 
-echo "--------------------------------------"
-echo "--          Network Setup           --"
-echo "--------------------------------------"
-pacman -S networkmanager dhclient --noconfirm --needed
-systemctl enable --now NetworkManager
+# Localization
+echo "Generating locales"
+sed -i '1i en_US.UTF-8 UTF-8'
+sed -i '1i en_US ISO-8859-1'
+locale-gen
+echo "LANG=en_US.UTF-8" > /etc/locale.conf
 
-echo "--------------------------------------"
-echo "--      Set Password for Root       --"
-echo "--------------------------------------"
-echo "Enter password for root user: "
-passwd root
+# Network configuration
+echo "Enter system hostname:"
+read HOSTNAME
+echo -e "127.0.0.1\tlocalhost\n::1\tlocalhost\n127.0.1.1\t$HOSTNAME.localdomain $HOSTNAME"
 
-exit
-umount -R /mnt
+# Build kernel
+echo "Building kernel"
+mkinitcpio -p linux
 
-echo "--------------------------------------"
-echo "--   SYSTEM READY FOR FIRST BOOT    --"
-echo "--------------------------------------"
+# Set root password
+echo "Enter root password:"
+passwd
+
+# Installing grub
+pacman -S grub
+grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id=ARCH
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# Reboot
+echo "Hit ENTER to reboot and complete installation"
+read REBOOT
+reboot
